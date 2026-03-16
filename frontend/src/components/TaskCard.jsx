@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Trash2, GripVertical, Play, Square, RotateCcw, Clock, AlertTriangle } from 'lucide-react';
 
+const priorityConfig = {
+  high: { label: 'High', color: '#f85149', bg: 'rgba(248, 81, 73, 0.15)' },
+  medium: { label: 'Medium', color: '#d29922', bg: 'rgba(210, 153, 34, 0.15)' },
+  low: { label: 'Low', color: '#2ea043', bg: 'rgba(46, 160, 67, 0.15)' },
+};
+
 const TaskCard = ({ task, innerRef, provided, isDragging, onDelete, onTimerAction }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [currentElapsed, setCurrentElapsed] = useState(task.elapsedSeconds || 0);
@@ -10,21 +16,17 @@ const TaskCard = ({ task, innerRef, provided, isDragging, onDelete, onTimerActio
   const estimatedSeconds = task.estimatedMinutes ? task.estimatedMinutes * 60 : null;
   const isOverdue = estimatedSeconds && currentElapsed > estimatedSeconds;
   const hasEstimate = task.estimatedMinutes && task.estimatedMinutes > 0;
+  const prio = priorityConfig[task.priority] || priorityConfig.medium;
 
-  // Live ticking timer
   useEffect(() => {
     if (task.isRunning && task.startedAt) {
       const startTime = new Date(task.startedAt).getTime();
-
       const tick = () => {
-        const now = Date.now();
-        const additionalSeconds = Math.floor((now - startTime) / 1000);
+        const additionalSeconds = Math.floor((Date.now() - startTime) / 1000);
         setCurrentElapsed((task.elapsedSeconds || 0) + additionalSeconds);
       };
-
-      tick(); // immediately
+      tick();
       intervalRef.current = setInterval(tick, 1000);
-
       return () => clearInterval(intervalRef.current);
     } else {
       setCurrentElapsed(task.elapsedSeconds || 0);
@@ -32,28 +34,19 @@ const TaskCard = ({ task, innerRef, provided, isDragging, onDelete, onTimerActio
     }
   }, [task.isRunning, task.startedAt, task.elapsedSeconds]);
 
-  // Browser notification when overdue
   useEffect(() => {
     if (isOverdue && !hasNotified && task.isRunning) {
       setHasNotified(true);
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('⏰ Task Overdue!', {
-          body: `"${task.title}" has exceeded its estimated time of ${task.estimatedMinutes} min.`,
-          icon: '⏰'
-        });
-      } else if ('Notification' in window && Notification.permission !== 'denied') {
-        Notification.requestPermission().then(perm => {
-          if (perm === 'granted') {
-            new Notification('⏰ Task Overdue!', {
-              body: `"${task.title}" has exceeded its estimated time of ${task.estimatedMinutes} min.`,
-            });
-          }
-        });
+      if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new Notification('⏰ Task Overdue!', { body: `"${task.title}" exceeded ${task.estimatedMinutes} min` });
+        } else if (Notification.permission !== 'denied') {
+          Notification.requestPermission();
+        }
       }
     }
-  }, [isOverdue, hasNotified, task.isRunning, task.title, task.estimatedMinutes]);
+  }, [isOverdue, hasNotified, task.isRunning]);
 
-  // Reset notification flag when timer resets
   useEffect(() => {
     if (currentElapsed === 0) setHasNotified(false);
   }, [currentElapsed]);
@@ -73,19 +66,14 @@ const TaskCard = ({ task, innerRef, provided, isDragging, onDelete, onTimerActio
     const hrs = Math.floor(totalSeconds / 3600);
     const mins = Math.floor((totalSeconds % 3600) / 60);
     const secs = totalSeconds % 60;
-    if (hrs > 0) {
-      return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    }
+    if (hrs > 0) return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
   const getTimeRemaining = () => {
     if (!estimatedSeconds) return null;
     const remaining = estimatedSeconds - currentElapsed;
-    if (remaining <= 0) {
-      return `Overdue by ${formatTime(Math.abs(remaining))}`;
-    }
-    return `${formatTime(remaining)} left`;
+    return remaining <= 0 ? `Overdue by ${formatTime(Math.abs(remaining))}` : `${formatTime(remaining)} left`;
   };
 
   const getProgressPercent = () => {
@@ -99,32 +87,35 @@ const TaskCard = ({ task, innerRef, provided, isDragging, onDelete, onTimerActio
       ref={innerRef}
       {...provided.draggableProps}
       {...provided.dragHandleProps}
+      style={{ ...provided.draggableProps.style, borderLeftColor: prio.color }}
     >
       <div className="task-card-top">
         <GripVertical size={14} className="grip-icon" />
-        <button
-          className={`delete-btn ${showConfirm ? 'confirm' : ''}`}
-          onClick={handleDelete}
-          title={showConfirm ? 'Click again to confirm' : 'Delete task'}
-        >
-          <Trash2 size={14} />
-        </button>
+        <div className="task-card-top-right">
+          <span className="priority-badge" style={{ color: prio.color, background: prio.bg }}>
+            {prio.label}
+          </span>
+          <button
+            className={`delete-btn ${showConfirm ? 'confirm' : ''}`}
+            onClick={handleDelete}
+            title={showConfirm ? 'Click again to confirm' : 'Delete task'}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
 
       <h4>{task.title}</h4>
       {task.description && <p>{task.description}</p>}
 
-      {/* Timer Section */}
       {hasEstimate && (
         <div className={`timer-section ${isOverdue ? 'timer-overdue' : ''}`}>
-          {/* Progress bar */}
           <div className="timer-progress-bar">
             <div
               className={`timer-progress-fill ${isOverdue ? 'overdue-fill' : ''}`}
               style={{ width: `${getProgressPercent()}%` }}
             />
           </div>
-
           <div className="timer-info">
             <div className="timer-display">
               <Clock size={13} />
@@ -132,50 +123,30 @@ const TaskCard = ({ task, innerRef, provided, isDragging, onDelete, onTimerActio
               <span className="timer-separator">/</span>
               <span className="timer-estimate">{formatTime(estimatedSeconds)}</span>
             </div>
-
             <div className="timer-remaining">
               {isOverdue && <AlertTriangle size={13} className="overdue-icon" />}
               <span>{getTimeRemaining()}</span>
             </div>
           </div>
-
           <div className="timer-controls">
             {!task.isRunning ? (
-              <button
-                className="timer-btn start-btn"
-                onClick={(e) => { e.stopPropagation(); onTimerAction(task.id, 'start'); }}
-                title="Start Timer"
-              >
-                <Play size={14} />
-                Start
+              <button className="timer-btn start-btn" onClick={(e) => { e.stopPropagation(); onTimerAction(task.id, 'start'); }}>
+                <Play size={14} /> Start
               </button>
             ) : (
-              <button
-                className="timer-btn stop-btn"
-                onClick={(e) => { e.stopPropagation(); onTimerAction(task.id, 'stop'); }}
-                title="Stop Timer"
-              >
-                <Square size={14} />
-                Stop
+              <button className="timer-btn stop-btn" onClick={(e) => { e.stopPropagation(); onTimerAction(task.id, 'stop'); }}>
+                <Square size={14} /> Stop
               </button>
             )}
-            <button
-              className="timer-btn reset-btn"
-              onClick={(e) => { e.stopPropagation(); onTimerAction(task.id, 'reset'); }}
-              title="Reset Timer"
-            >
+            <button className="timer-btn reset-btn" onClick={(e) => { e.stopPropagation(); onTimerAction(task.id, 'reset'); }}>
               <RotateCcw size={14} />
             </button>
           </div>
         </div>
       )}
 
-      {/* Badge for estimated time if no timer started yet */}
       {hasEstimate && currentElapsed === 0 && !task.isRunning && (
-        <div className="estimate-badge">
-          <Clock size={12} />
-          {task.estimatedMinutes} min
-        </div>
+        <div className="estimate-badge"><Clock size={12} /> {task.estimatedMinutes} min</div>
       )}
     </div>
   );

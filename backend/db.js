@@ -37,6 +37,11 @@ const Task = sequelize.define('Task', {
     type: DataTypes.INTEGER,
     defaultValue: 0
   },
+  priority: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'medium' // 'low', 'medium', 'high'
+  },
   estimatedMinutes: {
     type: DataTypes.INTEGER,
     allowNull: true,
@@ -59,6 +64,21 @@ const Task = sequelize.define('Task', {
   }
 });
 
+const ActivityLog = sequelize.define('ActivityLog', {
+  action: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  details: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  taskTitle: {
+    type: DataTypes.STRING,
+    allowNull: true
+  }
+});
+
 // Relationships
 Board.hasMany(Column);
 Column.belongsTo(Board);
@@ -66,4 +86,7 @@ Column.belongsTo(Board);
 Column.hasMany(Task);
 Task.belongsTo(Column);
 
-module.exports = { sequelize, Board, Column, Task };
+Board.hasMany(ActivityLog);
+ActivityLog.belongsTo(Board);
+
+module.exports = { sequelize, Board, Column, Task, ActivityLog };
