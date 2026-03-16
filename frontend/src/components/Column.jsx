@@ -3,7 +3,7 @@ import { Droppable, Draggable } from '@hello-pangea/dnd';
 import TaskCard from './TaskCard';
 import { Plus } from 'lucide-react';
 
-const Column = ({ column, index, tasks, onAddTask, onDeleteTask }) => {
+const Column = ({ column, index, tasks, onAddTask, onDeleteTask, onTimerAction }) => {
   return (
     <Draggable draggableId={`column-${column.id}`} index={index}>
       {(provided, snapshot) => (
@@ -33,6 +33,7 @@ const Column = ({ column, index, tasks, onAddTask, onDeleteTask }) => {
                         provided={provided}
                         isDragging={snapshot.isDragging}
                         onDelete={onDeleteTask}
+                        onTimerAction={onTimerAction}
                       />
                     )}
                   </Draggable>

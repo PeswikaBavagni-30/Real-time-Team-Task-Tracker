@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Clock } from 'lucide-react';
 
 const AddTaskModal = ({ onClose, onSubmit }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [estimatedMinutes, setEstimatedMinutes] = useState('');
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -13,13 +14,15 @@ const AddTaskModal = ({ onClose, onSubmit }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSubmit(title.trim(), description.trim());
+    onSubmit(
+      title.trim(),
+      description.trim(),
+      estimatedMinutes ? parseInt(estimatedMinutes, 10) : null
+    );
   };
 
   const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
+    if (e.target === e.currentTarget) onClose();
   };
 
   return (
@@ -54,13 +57,24 @@ const AddTaskModal = ({ onClose, onSubmit }) => {
               rows={3}
             />
           </div>
+          <div className="form-group">
+            <label htmlFor="task-time">
+              <Clock size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+              Estimated Time (minutes)
+            </label>
+            <input
+              id="task-time"
+              type="number"
+              min="1"
+              max="999"
+              value={estimatedMinutes}
+              onChange={(e) => setEstimatedMinutes(e.target.value)}
+              placeholder="e.g. 30"
+            />
+          </div>
           <div className="modal-actions">
-            <button type="button" className="btn-cancel" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="btn-submit" disabled={!title.trim()}>
-              Add Task
-            </button>
+            <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-submit" disabled={!title.trim()}>Add Task</button>
           </div>
         </form>
       </div>

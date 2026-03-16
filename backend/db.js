@@ -36,6 +36,26 @@ const Task = sequelize.define('Task', {
   order: {
     type: DataTypes.INTEGER,
     defaultValue: 0
+  },
+  estimatedMinutes: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null
+  },
+  startedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null
+  },
+  elapsedSeconds: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0
+  },
+  isRunning: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
   }
 });
 

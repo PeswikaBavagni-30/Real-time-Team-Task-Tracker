@@ -561,6 +561,171 @@ body {
   75% { transform: translateX(3px); }
 }
 
+/* ================== TIMER SECTION ================== */
+.timer-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.timer-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.timer-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-color), #79b8ff);
+  border-radius: 4px;
+  transition: width 1s linear;
+}
+
+.timer-progress-fill.overdue-fill {
+  background: linear-gradient(90deg, var(--warning-color), var(--danger-color));
+}
+
+.timer-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.timer-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.timer-elapsed {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.timer-separator {
+  opacity: 0.4;
+}
+
+.timer-estimate {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+
+.timer-remaining {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--success-color);
+  font-weight: 500;
+}
+
+.timer-overdue .timer-remaining {
+  color: var(--danger-color);
+  animation: pulseText 1.5s infinite;
+}
+
+.overdue-icon {
+  color: var(--danger-color);
+}
+
+.timer-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.timer-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.start-btn {
+  background: rgba(46, 160, 67, 0.15);
+  color: var(--success-color);
+  border: 1px solid rgba(46, 160, 67, 0.3);
+}
+
+.start-btn:hover {
+  background: rgba(46, 160, 67, 0.3);
+  box-shadow: 0 0 8px rgba(46, 160, 67, 0.3);
+}
+
+.stop-btn {
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--warning-color);
+  border: 1px solid rgba(210, 153, 34, 0.3);
+}
+
+.stop-btn:hover {
+  background: rgba(210, 153, 34, 0.3);
+  box-shadow: 0 0 8px rgba(210, 153, 34, 0.3);
+}
+
+.reset-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.reset-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.estimate-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 3px 8px;
+  background: rgba(88, 166, 255, 0.1);
+  border: 1px solid rgba(88, 166, 255, 0.2);
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--accent-color);
+}
+
+/* Overdue card styling */
+.task-card.overdue {
+  border-color: rgba(248, 81, 73, 0.4);
+}
+
+.task-card.overdue::before {
+  background: var(--danger-color);
+  opacity: 1;
+  animation: overduePulse 1.5s infinite;
+}
+
+@keyframes pulseText {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes overduePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* ================== RESPONSIVE ================== */
 @media (max-width: 768px) {
   .app-container {
@@ -578,3 +743,4 @@ body {
     max-width: 280px;
   }
 }
+

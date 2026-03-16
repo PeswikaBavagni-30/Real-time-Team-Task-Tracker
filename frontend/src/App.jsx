@@ -40,6 +40,7 @@ function App() {
     socket.on('task_deleted', fetchBoard);
     socket.on('columns_reordered', fetchBoard);
     socket.on('tasks_reordered', fetchBoard);
+    socket.on('task_timer_updated', fetchBoard);
 
     return () => {
       socket.off('task_moved');
@@ -47,15 +48,17 @@ function App() {
       socket.off('task_deleted');
       socket.off('columns_reordered');
       socket.off('tasks_reordered');
+      socket.off('task_timer_updated');
     };
   }, [fetchBoard]);
 
-  const handleAddTask = async (title, description) => {
+  const handleAddTask = async (title, description, estimatedMinutes) => {
     try {
       await axios.post(`${API}/tasks`, {
         title,
         description,
         ColumnId: addToColumnId,
+        estimatedMinutes: estimatedMinutes || null,
       });
       setShowAddModal(false);
       setAddToColumnId(null);
@@ -72,6 +75,14 @@ function App() {
     }
   };
 
+  const handleTimerAction = async (taskId, action) => {
+    try {
+      await axios.put(`${API}/tasks/${taskId}/timer/${action}`);
+    } catch (err) {
+      console.error(`Error ${action} timer:`, err);
+    }
+  };
+
   const openAddModal = (columnId) => {
     setAddToColumnId(columnId);
     setShowAddModal(true);
@@ -84,9 +95,7 @@ function App() {
     if (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
-    ) {
-      return;
-    }
+    ) return;
 
     if (!board || !board.Columns) return;
 
@@ -94,7 +103,6 @@ function App() {
       const newColumns = Array.from(board.Columns);
       const [removed] = newColumns.splice(source.index, 1);
       newColumns.splice(destination.index, 0, removed);
-
       setBoard({ ...board, Columns: newColumns });
 
       try {
@@ -107,25 +115,16 @@ function App() {
       return;
     }
 
-    // Task movement
-    const sourceColumn = board.Columns.find(
-      (col) => col.id.toString() === source.droppableId
-    );
-    const destColumn = board.Columns.find(
-      (col) => col.id.toString() === destination.droppableId
-    );
-
+    const sourceColumn = board.Columns.find(col => col.id.toString() === source.droppableId);
+    const destColumn = board.Columns.find(col => col.id.toString() === destination.droppableId);
     if (!sourceColumn || !destColumn) return;
 
     if (sourceColumn.id === destColumn.id) {
-      // Same column reorder
       const newTasks = Array.from(sourceColumn.Tasks);
       const [removed] = newTasks.splice(source.index, 1);
       newTasks.splice(destination.index, 0, removed);
-
-      const newColumn = { ...sourceColumn, Tasks: newTasks };
-      const newColumns = board.Columns.map((col) =>
-        col.id === newColumn.id ? newColumn : col
+      const newColumns = board.Columns.map(col =>
+        col.id === sourceColumn.id ? { ...col, Tasks: newTasks } : col
       );
       setBoard({ ...board, Columns: newColumns });
 
@@ -137,13 +136,12 @@ function App() {
         fetchBoard();
       }
     } else {
-      // Cross-column move
       const sourceTasks = Array.from(sourceColumn.Tasks);
       const destTasks = Array.from(destColumn.Tasks);
       const [removed] = sourceTasks.splice(source.index, 1);
       destTasks.splice(destination.index, 0, removed);
 
-      const newColumns = board.Columns.map((col) => {
+      const newColumns = board.Columns.map(col => {
         if (col.id === sourceColumn.id) return { ...col, Tasks: sourceTasks };
         if (col.id === destColumn.id) return { ...col, Tasks: destTasks };
         return col;
@@ -156,10 +154,8 @@ function App() {
           targetColumnId: destColumn.id,
           newOrder: destination.index,
         });
-
         const payload = destTasks.map((task, idx) => ({ id: task.id, order: idx }));
         await axios.put(`${API}/tasks/reorder`, { tasks: payload });
-
         const srcPayload = sourceTasks.map((task, idx) => ({ id: task.id, order: idx }));
         await axios.put(`${API}/tasks/reorder`, { tasks: srcPayload });
       } catch (err) {
@@ -196,11 +192,7 @@ function App() {
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="all-columns" direction="horizontal" type="column">
           {(provided) => (
-            <div
-              className="board"
-              {...provided.droppableProps}
-              ref={provided.innerRef}
-            >
+            <div className="board" {...provided.droppableProps} ref={provided.innerRef}>
               {board?.Columns?.map((column, index) => (
                 <Column
                   key={column.id}
@@ -209,6 +201,7 @@ function App() {
                   tasks={column.Tasks || []}
                   onAddTask={openAddModal}
                   onDeleteTask={handleDeleteTask}
+                  onTimerAction={handleTimerAction}
                 />
               ))}
               {provided.placeholder}
