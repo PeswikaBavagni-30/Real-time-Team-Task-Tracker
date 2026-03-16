@@ -1,35 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
-import Header from './components/Header'; // We'll add a simple header
+import Header from './components/Header';
 import Column from './components/Column';
-import api from './api';
+import AddTaskModal from './components/AddTaskModal';
 import { socket } from './socket';
+import axios from 'axios';
+
+const API = 'http://localhost:5000/api';
 
 function App() {
-  const [data, setData] = useState({ columns: [] });
+  const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addToColumnId, setAddToColumnId] = useState(null);
 
-  const fetchBoard = async () => {
+  const fetchBoard = useCallback(async () => {
     try {
-      const res = await api.get('/board');
-      setData(res.data);
+      const res = await axios.get(`${API}/board`);
+      if (res.data) {
+        setBoard(res.data);
+        setError(null);
+      } else {
+        setError('No board data found.');
+      }
       setLoading(false);
     } catch (err) {
       console.error('Error fetching board:', err);
+      setError('Failed to connect to backend. Make sure the server is running on port 5000.');
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchBoard();
 
-    // Socket listeners
-    socket.on('task_moved', (moveData) => {
-      // For a robust implementation, we might just refetch or apply optimistic update
-      // Taking the easy route here to guarantee state consistency across clients:
-      fetchBoard();
-    });
-
+    socket.on('task_moved', fetchBoard);
     socket.on('task_created', fetchBoard);
     socket.on('task_deleted', fetchBoard);
     socket.on('columns_reordered', fetchBoard);
@@ -42,13 +48,39 @@ function App() {
       socket.off('columns_reordered');
       socket.off('tasks_reordered');
     };
-  }, []);
+  }, [fetchBoard]);
+
+  const handleAddTask = async (title, description) => {
+    try {
+      await axios.post(`${API}/tasks`, {
+        title,
+        description,
+        ColumnId: addToColumnId,
+      });
+      setShowAddModal(false);
+      setAddToColumnId(null);
+    } catch (err) {
+      console.error('Error creating task:', err);
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    try {
+      await axios.delete(`${API}/tasks/${taskId}`);
+    } catch (err) {
+      console.error('Error deleting task:', err);
+    }
+  };
+
+  const openAddModal = (columnId) => {
+    setAddToColumnId(columnId);
+    setShowAddModal(true);
+  };
 
   const onDragEnd = async (result) => {
     const { destination, source, draggableId, type } = result;
 
     if (!destination) return;
-
     if (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
@@ -56,71 +88,80 @@ function App() {
       return;
     }
 
+    if (!board || !board.Columns) return;
+
     if (type === 'column') {
-      const newColumns = Array.from(data.Columns);
+      const newColumns = Array.from(board.Columns);
       const [removed] = newColumns.splice(source.index, 1);
       newColumns.splice(destination.index, 0, removed);
 
-      // Optimistic UI update
-      setData({ ...data, Columns: newColumns });
+      setBoard({ ...board, Columns: newColumns });
 
       try {
         const payload = newColumns.map((col, index) => ({ id: col.id, order: index }));
-        await api.reorderColumns(payload);
+        await axios.put(`${API}/columns/reorder`, { columns: payload });
       } catch (err) {
         console.error(err);
-        fetchBoard(); // Revert on error
+        fetchBoard();
       }
       return;
     }
 
     // Task movement
-    const sourceColumn = data.Columns.find(col => col.id.toString() === source.droppableId);
-    const destColumn = data.Columns.find(col => col.id.toString() === destination.droppableId);
+    const sourceColumn = board.Columns.find(
+      (col) => col.id.toString() === source.droppableId
+    );
+    const destColumn = board.Columns.find(
+      (col) => col.id.toString() === destination.droppableId
+    );
 
-    if (sourceColumn === destColumn) {
+    if (!sourceColumn || !destColumn) return;
+
+    if (sourceColumn.id === destColumn.id) {
+      // Same column reorder
       const newTasks = Array.from(sourceColumn.Tasks);
       const [removed] = newTasks.splice(source.index, 1);
       newTasks.splice(destination.index, 0, removed);
 
       const newColumn = { ...sourceColumn, Tasks: newTasks };
-      const newColumns = data.Columns.map(col =>
+      const newColumns = board.Columns.map((col) =>
         col.id === newColumn.id ? newColumn : col
       );
-
-      setData({ ...data, Columns: newColumns });
+      setBoard({ ...board, Columns: newColumns });
 
       try {
         const payload = newTasks.map((task, index) => ({ id: task.id, order: index }));
-        await api.put('/tasks/reorder', { tasks: payload });
+        await axios.put(`${API}/tasks/reorder`, { tasks: payload });
       } catch (err) {
         console.error(err);
         fetchBoard();
       }
     } else {
+      // Cross-column move
       const sourceTasks = Array.from(sourceColumn.Tasks);
       const destTasks = Array.from(destColumn.Tasks);
       const [removed] = sourceTasks.splice(source.index, 1);
       destTasks.splice(destination.index, 0, removed);
 
-      const newSourceColumn = { ...sourceColumn, Tasks: sourceTasks };
-      const newDestColumn = { ...destColumn, Tasks: destTasks };
-
-      const newColumns = data.Columns.map(col => {
-        if (col.id === sourceColumn.id) return newSourceColumn;
-        if (col.id === destColumn.id) return newDestColumn;
+      const newColumns = board.Columns.map((col) => {
+        if (col.id === sourceColumn.id) return { ...col, Tasks: sourceTasks };
+        if (col.id === destColumn.id) return { ...col, Tasks: destTasks };
         return col;
       });
-
-      setData({ ...data, Columns: newColumns });
+      setBoard({ ...board, Columns: newColumns });
 
       try {
         const taskId = draggableId.replace('task-', '');
-        await api.put(`/tasks/${taskId}/move`, { targetColumnId: destColumn.id, newOrder: destination.index });
-        
-        // Update siblings order in destination
-        const payload = destTasks.map((task, index) => ({ id: task.id, order: index }));
-        await api.put('/tasks/reorder', { tasks: payload });
+        await axios.put(`${API}/tasks/${taskId}/move`, {
+          targetColumnId: destColumn.id,
+          newOrder: destination.index,
+        });
+
+        const payload = destTasks.map((task, idx) => ({ id: task.id, order: idx }));
+        await axios.put(`${API}/tasks/reorder`, { tasks: payload });
+
+        const srcPayload = sourceTasks.map((task, idx) => ({ id: task.id, order: idx }));
+        await axios.put(`${API}/tasks/reorder`, { tasks: srcPayload });
       } catch (err) {
         console.error(err);
         fetchBoard();
@@ -128,12 +169,30 @@ function App() {
     }
   };
 
-  if (loading) return <div className="loading">Loading Board...</div>;
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="spinner"></div>
+        <p>Loading Board...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="error-screen">
+        <div className="error-icon">⚠️</div>
+        <h2>Connection Error</h2>
+        <p>{error}</p>
+        <button onClick={fetchBoard} className="retry-btn">Retry</button>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
-      <Header title={data.title || 'Task Tracker'} connected={socket.connected} />
-      
+      <Header title={board?.title || 'Task Tracker'} />
+
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="all-columns" direction="horizontal" type="column">
           {(provided) => (
@@ -142,14 +201,28 @@ function App() {
               {...provided.droppableProps}
               ref={provided.innerRef}
             >
-              {data.Columns?.map((column, index) => (
-                <Column key={column.id} column={column} tasks={column.Tasks || []} />
+              {board?.Columns?.map((column, index) => (
+                <Column
+                  key={column.id}
+                  column={column}
+                  index={index}
+                  tasks={column.Tasks || []}
+                  onAddTask={openAddModal}
+                  onDeleteTask={handleDeleteTask}
+                />
               ))}
               {provided.placeholder}
             </div>
           )}
         </Droppable>
       </DragDropContext>
+
+      {showAddModal && (
+        <AddTaskModal
+          onClose={() => { setShowAddModal(false); setAddToColumnId(null); }}
+          onSubmit={handleAddTask}
+        />
+      )}
     </div>
   );
 }

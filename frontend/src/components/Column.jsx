@@ -1,10 +1,11 @@
 import React from 'react';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import TaskCard from './TaskCard';
+import { Plus } from 'lucide-react';
 
-const Column = ({ column, tasks }) => {
+const Column = ({ column, index, tasks, onAddTask, onDeleteTask }) => {
   return (
-    <Draggable draggableId={`column-${column.id}`} index={column.order}>
+    <Draggable draggableId={`column-${column.id}`} index={index}>
       {(provided, snapshot) => (
         <div
           className={`column ${snapshot.isDragging ? 'dragging-column' : ''}`}
@@ -23,14 +24,15 @@ const Column = ({ column, tasks }) => {
                 ref={provided.innerRef}
                 {...provided.droppableProps}
               >
-                {tasks.map((task, index) => (
-                  <Draggable key={task.id} draggableId={`task-${task.id}`} index={index}>
+                {tasks.map((task, idx) => (
+                  <Draggable key={task.id} draggableId={`task-${task.id}`} index={idx}>
                     {(provided, snapshot) => (
                       <TaskCard
                         task={task}
                         innerRef={provided.innerRef}
                         provided={provided}
                         isDragging={snapshot.isDragging}
+                        onDelete={onDeleteTask}
                       />
                     )}
                   </Draggable>
@@ -39,6 +41,11 @@ const Column = ({ column, tasks }) => {
               </div>
             )}
           </Droppable>
+
+          <button className="add-task-btn" onClick={() => onAddTask(column.id)}>
+            <Plus size={16} />
+            Add Task
+          </button>
         </div>
       )}
     </Draggable>
